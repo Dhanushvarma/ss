@@ -81,6 +81,8 @@
                   <geom pos="-0.02 0 0" quat="1 0 0 1" mesh="wx250s_7_gripper" class="collision"/>
                   <geom pos="-0.02 0 0" quat="1 0 0 1" mesh="wx250s_9_gripper_bar" class="visual"/>
                   <geom pos="-0.02 0 0" quat="1 0 0 1" mesh="wx250s_9_gripper_bar" class="collision"/>
+                  <site name="pinch_site" pos="0.1 0 0" size="0.005" rgba="0.6 0.3 0.3 1" group="5"/>
+                  <site name="attachment_site" pos="0.1 0 0" size="0.005" rgba="0.6 0.3 0.3 1" group="6"/>
                   <body name="wx250s/left_finger_link" pos="0.066 0 0">
                     <inertial pos="0.013816 0 0" quat="0.705384 0.705384 -0.0493271 -0.0493271" mass="0.016246"
                       diaginertia="4.79509e-06 3.7467e-06 1.48651e-06"/>
@@ -112,9 +114,9 @@
     <exclude body1="wx250s/base_link" body2="wx250s/shoulder_link"/>
   </contact>
 
-  <equality>
+  <!-- <equality>
     <joint joint1="left_finger" joint2="right_finger" polycoef="0 -1 0 0 0"/>
-  </equality>
+  </equality> -->
 
   <actuator>
     <position class="wx250s" name="waist" joint="waist"/>
@@ -123,10 +125,11 @@
     <position class="wx250s" name="forearm_roll" joint="forearm_roll"/>
     <position class="wx250s" name="wrist_angle" joint="wrist_angle"/>
     <position class="wx250s" name="wrist_rotate" joint="wrist_rotate"/>
-    <position class="wx250s" name="gripper" joint="left_finger" kp="200"/>
+    <position class="wx250s" name="left_finger" joint="left_finger" kp="200"/>
+    <position class="wx250s" name="right_finger" joint="right_finger" kp="200"/>
   </actuator>
 
   <keyframe>
-    <key name="home" qpos="0 -0.96 1.16 0 -0.3 0 0.015 -0.015" ctrl="0 -0.96 1.16 0 -0.3 0 0.015"/>
+    <key name="home" qpos="0 -0.96 1.16 0 -0.3 0 0.015 -0.015" ctrl="0 -0.96 1.16 0 -0.3 0 0.015 -0.015"/>
   </keyframe>
 </mujoco>
