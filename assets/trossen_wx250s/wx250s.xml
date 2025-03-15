@@ -129,7 +129,7 @@
     <position class="wx250s" name="right_finger" joint="right_finger" kp="200"/>
   </actuator>
 
-  <keyframe>
+  <!-- <keyframe>
     <key name="home" qpos="0 -0.96 1.16 0 -0.3 0 0.015 -0.015" ctrl="0 -0.96 1.16 0 -0.3 0 0.015 -0.015"/>
-  </keyframe>
+  </keyframe> -->
 </mujoco>

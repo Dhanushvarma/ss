@@ -3,12 +3,14 @@ import mujoco.viewer
 import numpy as np
 import time
 
+# reference joint config
+home_joint_pos = [0, -0.96, 1.16, 0, -0.3, 0, 0.015, -0.015]  # length : num_joints
+
 # Cartesian impedance control gains.
 impedance_pos = np.asarray([100.0, 100.0, 100.0])  # [N/m]
 impedance_ori = np.asarray([50.0, 50.0, 50.0])  # [Nm/rad]
 
 # Joint impedance control gains.
-# Joint Names : ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate", "left_finger", "right_finger"]
 Kp_null = np.asarray([75.0, 50.0, 50.0, 50.0, 25.0, 25.0, 10.0, 10.0])  # TODO: Tune
 
 # Damping ratio for both Cartesian and joint impedance control.
@@ -39,6 +41,7 @@ def main() -> None:
     model = mujoco.MjModel.from_xml_path(
         "/home/dhanush/dhanush_ws/lira/ss/assets/trossen_wx250s/scene.xml"
     )
+
     data = mujoco.MjData(model)
 
     model.opt.timestep = dt
@@ -69,11 +72,7 @@ def main() -> None:
     ]
     dof_ids = np.array([model.joint(name).id for name in joint_names])
     actuator_ids = np.array([model.actuator(name).id for name in joint_names])
-
-    # Initial joint configuration saved as a keyframe in the XML file.
-    key_name = "home"
-    key_id = model.key(key_name).id
-    q0 = model.key(key_name).qpos
+    robot_n_dofs = len(joint_names)
 
     # Mocap body we will control with our mouse.
     mocap_name = "target"
@@ -86,7 +85,7 @@ def main() -> None:
     site_quat_conj = np.zeros(4)
     error_quat = np.zeros(4)
     M_inv = np.zeros((model.nv, model.nv))
-    Mx = np.zeros((6, 6))
+    robot_Mx = np.zeros((6, 6))
 
     with mujoco.viewer.launch_passive(
         model=model,
@@ -95,7 +94,8 @@ def main() -> None:
         show_right_ui=False,
     ) as viewer:
         # Reset the simulation.
-        mujoco.mj_resetDataKeyframe(model, data, key_id)
+        mujoco.mj_resetData(model, data)
+        data.qpos[dof_ids] = home_joint_pos
 
         # Reset the free camera.
         mujoco.mjv_defaultFreeCamera(model, viewer.cam)
@@ -116,32 +116,39 @@ def main() -> None:
 
             # Jacobian.
             mujoco.mj_jacSite(model, data, jac[:3], jac[3:], site_id)
+            robot_jac = jac[:, :robot_n_dofs]
 
             # Compute the task-space inertia matrix.
             mujoco.mj_solveM(model, data, M_inv, np.eye(model.nv))
-            Mx_inv = jac @ M_inv @ jac.T
-            if abs(np.linalg.det(Mx_inv)) >= 1e-2:
-                Mx = np.linalg.inv(Mx_inv)
+            robot_M_inv = M_inv[:robot_n_dofs, :robot_n_dofs]
+            robot_Mx_inv = robot_jac @ robot_M_inv @ robot_jac.T
+            if abs(np.linalg.det(robot_Mx_inv)) >= 1e-2:
+                robot_Mx = np.linalg.inv(robot_Mx_inv)
             else:
-                Mx = np.linalg.pinv(Mx_inv, rcond=1e-2)
+                robot_Mx = np.linalg.pinv(robot_Mx_inv, rcond=1e-2)
 
             # Compute generalized forces.
-            tau = jac.T @ Mx @ (Kp * twist - Kd * (jac @ data.qvel[dof_ids]))
-
-            print("tau", tau)
+            robot_tau = (
+                robot_jac.T
+                @ robot_Mx
+                @ (Kp * twist - Kd * (robot_jac @ data.qvel[dof_ids]))
+            )
 
             # Add joint task in nullspace.
-            Jbar = M_inv @ jac.T @ Mx
-            ddq = Kp_null * (q0 - data.qpos[dof_ids]) - Kd_null * data.qvel[dof_ids]
-            tau += (np.eye(model.nv) - jac.T @ Jbar.T) @ ddq
+            robot_Jbar = robot_M_inv @ robot_jac.T @ robot_Mx
+            robot_ddq = (
+                Kp_null * (home_joint_pos - data.qpos[dof_ids])
+                - Kd_null * data.qvel[dof_ids]
+            )
+            robot_tau += (np.eye(robot_n_dofs) - robot_jac.T @ robot_Jbar.T) @ robot_ddq
 
             # Add gravity compensation.
             if gravity_compensation:
-                tau += data.qfrc_bias[dof_ids]
+                robot_tau += data.qfrc_bias[dof_ids]
 
             # Set the control signal and step the simulation.
-            np.clip(tau, *model.actuator_ctrlrange.T, out=tau)
-            data.ctrl[actuator_ids] = tau[actuator_ids]
+            np.clip(robot_tau, *model.actuator_ctrlrange.T, out=robot_tau)
+            data.ctrl[actuator_ids] = robot_tau[actuator_ids]
             mujoco.mj_step(model, data)
 
             viewer.sync()
