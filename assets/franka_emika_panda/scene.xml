@@ -26,5 +26,14 @@
       <geom type="box" size=".05 .05 .05" contype="0" conaffinity="0" rgba=".6 .3 .3 0.5" />
       <site type="sphere" size="0.001" rgba="0 0 1 1" group="1" />
     </body>
+
+
+    <camera name="frontview" pos="1.15 0 0.2125" quat="0.5 0.5 0.5 0.5" />
+    <camera name="agentview" pos="1.15 0 0.5" quat="0.5879378 0.3928475 0.3928475 0.5879378" />
+    <camera name="topview" pos="0.4 0 0.86" quat="0.7071068 0 0 0.7071068" />
+    <camera name="leftview" pos="0.4 -0.6 0.25" quat="0.7071068 0.7071068 0 0" />
+    <camera name="rightview" pos="0.4 0.6 0.25" quat="0 0 0.7071068 0.7071068" />
+
+
   </worldbody>
 </mujoco>
