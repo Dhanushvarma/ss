@@ -28,11 +28,11 @@
     </body>
 
 
-    <camera name="frontview" pos="1.15 0 0.2125" quat="0.5 0.5 0.5 0.5" />
-    <camera name="agentview" pos="1.15 0 0.5" quat="0.5879378 0.3928475 0.3928475 0.5879378" />
-    <camera name="topview" pos="0.4 0 0.86" quat="0.7071068 0 0 0.7071068" />
-    <camera name="leftview" pos="0.4 -0.6 0.25" quat="0.7071068 0.7071068 0 0" />
-    <camera name="rightview" pos="0.4 0.6 0.25" quat="0 0 0.7071068 0.7071068" />
+    <camera name="front_view" pos="1.15 0 0.2125" quat="0.5 0.5 0.5 0.5" />
+    <camera name="agent_view" pos="1.15 0 0.5" quat="0.5879378 0.3928475 0.3928475 0.5879378" />
+    <camera name="top_view" pos="0.4 0 0.86" quat="0.7071068 0 0 0.7071068" />
+    <camera name="left_view" pos="0.4 -0.6 0.25" quat="0.7071068 0.7071068 0 0" />
+    <camera name="right_view" pos="0.4 0.6 0.25" quat="0 0 0.7071068 0.7071068" />
 
 
   </worldbody>

@@ -12,13 +12,33 @@ from gymnasium import spaces
 class FrankaEnv(MujocoEnv):
     def __init__(self, model_path=None, render_mode=None):
 
+        IMAGE_SHAPE = (224, 224, 3)
+
         observation_space = spaces.Dict(
             {
-                "vector": spaces.Box(
-                    low=-np.inf, high=np.inf, shape=(21,), dtype=np.float64
+                "joint_pos": spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(7,), dtype=np.float64
                 ),
-                "images": spaces.Box(
-                    low=0, high=255, shape=(4, 224, 224, 3), dtype=np.uint8
+                "eef_pos": spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(3,), dtype=np.float64
+                ),
+                "eef_quat": spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(4,), dtype=np.float64
+                ),
+                "gripper_pos": spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(2,), dtype=np.float64
+                ),
+                "front_view": spaces.Box(
+                    low=0, high=255, shape=IMAGE_SHAPE, dtype=np.uint8
+                ),
+                "top_view": spaces.Box(
+                    low=0, high=255, shape=IMAGE_SHAPE, dtype=np.uint8
+                ),
+                "right_view": spaces.Box(
+                    low=0, high=255, shape=IMAGE_SHAPE, dtype=np.uint8
+                ),
+                "left_view": spaces.Box(
+                    low=0, high=255, shape=IMAGE_SHAPE, dtype=np.uint8
                 ),
             }
         )
@@ -68,8 +88,13 @@ class FrankaEnv(MujocoEnv):
             "joint6",
             "joint7",
         ]
+        self.finger_joint_names = ["finger_joint1", "finger_joint2"]
+        self.scene_cam_names = ["front_view", "top_view", "left_view", "right_view"]
         self.dof_ids = np.array(
             [self.model.joint(name).id for name in self.joint_names]
+        )
+        self.finger_dof_ids = np.array(
+            [self.model.joint(name).id for name in self.finger_joint_names]
         )
         self.actuator_ids = np.array(
             [self.model.actuator(name).id for name in self.joint_names]
@@ -173,33 +198,52 @@ class FrankaEnv(MujocoEnv):
 
     def _get_obs(self):
 
-        # raw observations
-        joint_pos = self.data.qpos[self.dof_ids]  # 7
-        joint_vel = self.data.qvel[self.dof_ids]  # 7
-        ee_pos = self.data.site(self.site_id).xpos  # 3
+        _obs_dict = {}
+
         ee_quat = np.zeros(4)  # 4
         mujoco.mju_mat2Quat(ee_quat, self.data.site(self.site_id).xmat)
-        vector_obs = np.concatenate([joint_pos, joint_vel, ee_pos, ee_quat])  # 21
 
-        # image observations
-        _camera_ids = ["frontview", "topview", "leftview", "rightview"]
-        images = []
+        _obs_dict["joint_pos"] = self.data.qpos[self.dof_ids]
+        # TODO: if needed add joint velocity, using "self.data.qvel[self.dof_ids]"
+        _obs_dict["eef_pos"] = self.data.site(self.site_id).xpos
+        _obs_dict["eef_quat"] = ee_quat
 
-        for cam_id in _camera_ids:
+        # gripper position
+        _obs_dict["gripper_pos"] = np.array(
+            [pos for pos in self.data.qpos[self.finger_dof_ids]]
+        )
+
+        # images fromc cameras in the scene
+        for cam_name in self.scene_cam_names:
             self.offscreen_renderer.update_scene(
-                data=self.data, camera=self.model.camera(cam_id).id
+                data=self.data, camera=self.model.camera(cam_name).id
             )
-            images.append(self.offscreen_renderer.render())
+            _obs_dict[cam_name] = self.offscreen_renderer.render()
 
-        images = np.array(images)
+        return _obs_dict
 
-        return {"vector": vector_obs, "images": images}
+    def step(self, action, mode="delta"):
 
-    def step(self, action):
+        assert mode in ["delta", "abs"], f"Invalid mode {mode}"
+
+        # NOTE: grip will remain same for either mode
 
         for i in range(self.gym_step):
             continuous_action, grip = action
-            robot_tau = self._compute_osc(continuous_action)
+
+            if mode == "delta":
+                self._compute_new_target(continuous_action)
+
+            else:
+                self.data.mocap_pos[self.mocap_id] = continuous_action[:3]
+
+                # NOTE: for now orientation is unchanged
+                if False:
+                    _target_quat = np.zeros(4)
+                    mujoco.mju_euler2Quat(_target_quat, continuous_action[3:])
+                    self.data.mocap_quat[self.mocap_id] = _target_quat
+
+            robot_tau = self._compute_osc()
             ctrl = np.zeros(self.model.nu)
             ctrl[self.actuator_ids] = robot_tau
             ctrl[self.grip_actuator_id] = 255 if grip == 0 else 0
@@ -215,7 +259,10 @@ class FrankaEnv(MujocoEnv):
 
         return obs, reward, terminated, truncated, info
 
-    def _compute_osc(self, continuous_action):
+    def _compute_new_target(self, continuous_action):
+        """
+        meant to compute updated pose for the mocap(target), for delta mode
+        """
 
         # current mocap
         current_pos = self.data.mocap_pos[self.mocap_id]
@@ -229,16 +276,20 @@ class FrankaEnv(MujocoEnv):
             new_pos, self._workspace_bounds[:, 0], self._workspace_bounds[:, 1]
         )
 
-        # delta orientation
-        # ori_scale = 0.1  # ~6 degrees maximum rotation per step
-        # ori_delta = continuous_action[3:] * ori_scale
-        # TODO: calc new ori
+        # NOTE: for now orientation is unchanged
+        if False:
+            # delta orientation
+            ori_scale = 0.1  # ~6 degrees maximum rotation per step
+            ori_delta = continuous_action[3:] * ori_scale
 
         # update target mocap pose
         self.data.mocap_pos[self.mocap_id] = new_pos
         self.data.mocap_quat[self.mocap_id] = current_quat
 
-        ### NOTE : OSC Logic Begins ###
+    def _compute_osc(self):
+        """
+        Logic for OSC, assumes that the target pose is the mocap pose
+        """
 
         # 1. Compute twist
         dx = self.data.mocap_pos[self.mocap_id] - self.data.site(self.site_id).xpos
@@ -298,7 +349,5 @@ class FrankaEnv(MujocoEnv):
             *self.model.actuator_ctrlrange[: self.robot_n_dofs, :].T,
             out=robot_tau,
         )
-
-        ### NOTE : OSC Logic Ends ###
 
         return robot_tau
