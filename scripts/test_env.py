@@ -6,7 +6,7 @@ from ss.gamepad.controllers import PS4
 from ss.utils.gamepad_utils import get_gamepad_action, connect_gamepad
 
 # Create the environment with rendering in human mode
-env = gymnasium.make("ss/FrankaEnv-v0", render_mode="human")
+env = gymnasium.make("ss/FrankaLiftEnv-v0", render_mode="human")
 
 # Reset the environment with a specific seed for reproducibility
 observation, info = env.reset(seed=42)

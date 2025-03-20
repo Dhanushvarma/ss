@@ -15,5 +15,5 @@ class FrankaLiftEnv(FrankaEnv):
     pwd = os.path.dirname(os.path.abspath(__file__))
     LIFT_XML_PATH = os.path.join(pwd, "../../assets/franka_emika_panda/lift.xml")
 
-    def __init__(self, render_mode=None, xml_path=LIFT_XML_PATH):
-        super().__init__(render_mode, xml_path)
+    def __init__(self, model_path=LIFT_XML_PATH, render_mode=None):
+        super().__init__(model_path=model_path, render_mode=render_mode)

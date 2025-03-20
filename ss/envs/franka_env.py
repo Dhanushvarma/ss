@@ -48,10 +48,10 @@ class FrankaEnv(MujocoEnv):
 
         # NOTE: make the camera look like the agentview
         # TODO: can finetune to make it better
-        self.mujoco_renderer.cam.distance = 2.00
+        self.mujoco_renderer.cam.distance = 2.05
         self.mujoco_renderer.cam.azimuth = 180
-        self.mujoco_renderer.cam.elevation = -35
-        self.mujoco_renderer.cam.lookat[:] = np.array([0.0, -0.0, 0.0])
+        self.mujoco_renderer.cam.elevation = -25
+        self.mujoco_renderer.cam.lookat[:] = np.array([-0.5, -0.0, 0.0])
 
         self.step_start = None
 
