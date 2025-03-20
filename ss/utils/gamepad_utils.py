@@ -15,10 +15,16 @@ def get_gamepad_action(gamepad, position_gain=5e-4, orientation_gain=5e-4):
 
     action = np.zeros((7,))
 
+    threshold = 1e-1  # to remove deadzone noise
+
+    x = gamepad.axis("LEFT-Y") if abs(gamepad.axis("LEFT-Y")) > threshold else 0
+    y = gamepad.axis("LEFT-X") if abs(gamepad.axis("LEFT-X")) > threshold else 0
+    z = gamepad.axis("RIGHT-Y") if abs(gamepad.axis("RIGHT-Y")) > threshold else 0
+
     # position deltas
-    action[0] = position_gain * gamepad.axis("LEFT-Y")  # x
-    action[1] = position_gain * gamepad.axis("LEFT-X")  # y
-    action[2] = -position_gain * gamepad.axis("RIGHT-Y")  # z
+    action[0] = position_gain * x
+    action[1] = position_gain * y
+    action[2] = -position_gain * z
 
     # orientation deltas set to zero, TODO.
     action[3] = 0
