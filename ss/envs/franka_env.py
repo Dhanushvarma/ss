@@ -1,16 +1,26 @@
 import os
+import time
 
+import mujoco.renderer
 import numpy as np
 import mujoco
+import mujoco.viewer
 from gymnasium.envs.mujoco import MujocoEnv
 from gymnasium import spaces
-from gymnasium.envs.mujoco.mujoco_rendering import OffScreenViewer
 
 
 class FrankaEnv(MujocoEnv):
     def __init__(self, model_path=None, render_mode=None):
-        observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=(21,), dtype=np.float32
+
+        observation_space = spaces.Dict(
+            {
+                "vector": spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(21,), dtype=np.float64
+                ),
+                "images": spaces.Box(
+                    low=0, high=255, shape=(4, 224, 224, 3), dtype=np.uint8
+                ),
+            }
         )
 
         # default model path
@@ -23,12 +33,30 @@ class FrankaEnv(MujocoEnv):
             frame_skip=1,
             observation_space=observation_space,
             render_mode=render_mode,
-            width=480,
-            height=480,
         )
 
+        # default dt of model is 0.002 which means 500Hz
+        self.gym_step = 100
+
+        # Override with mujoco viewer
+        self.mujoco_renderer = mujoco.viewer.launch_passive(
+            model=self.model,
+            data=self.data,
+            show_left_ui=False,
+            show_right_ui=False,
+        )
+
+        # NOTE: make the camera look like the agentview
+        # TODO: can finetune to make it better
+        self.mujoco_renderer.cam.distance = 2.00
+        self.mujoco_renderer.cam.azimuth = 180
+        self.mujoco_renderer.cam.elevation = -35
+        self.mujoco_renderer.cam.lookat[:] = np.array([0.0, -0.0, 0.0])
+
+        self.step_start = None
+
         self._init_osc_params()
-        self._init_other_renders()
+        self._init_offscreen_renderer()
 
         # Franks ID's
         self.joint_names = [
@@ -78,6 +106,27 @@ class FrankaEnv(MujocoEnv):
             )
         )
 
+    def render(self, mode="human"):
+        """
+        only meant for human mode
+        """
+        assert mode == "human", "Only meant for human mode"
+        self._render_frame()
+
+    def _render_frame(self):
+        """
+        Render the frame for human mode
+        """
+
+        if self.step_start is None:
+            self.step_start = time.time()
+
+        self.mujoco_renderer.sync()
+        time_until_next_step = self.dt - (time.time() - self.step_start)
+        if time_until_next_step > 0:
+            time.sleep(time_until_next_step)
+        self.step_start = time.time()
+
     def _init_osc_params(self):
         """
         All the OSC related parameters
@@ -112,10 +161,9 @@ class FrankaEnv(MujocoEnv):
         # workspace bounds
         self._workspace_bounds = np.array([[0.15, 0.615], [-0.35, 0.35], [0, 0.6]])
 
-    def _init_other_renders(self):
-
-        self.offscreen_renderer = OffScreenViewer(
-            model=self.model, data=self.data, width=224, height=224
+    def _init_offscreen_renderer(self):
+        self.offscreen_renderer = mujoco.renderer.Renderer(
+            model=self.model, height=224, width=224
         )
 
     def reset_model(self):
@@ -124,37 +172,46 @@ class FrankaEnv(MujocoEnv):
         return self._get_obs()
 
     def _get_obs(self):
-        joint_pos = self.data.qpos[self.dof_ids]
-        joint_vel = self.data.qvel[self.dof_ids]
-        ee_pos = self.data.site(self.site_id).xpos
-        ee_quat = np.zeros(4)
+
+        # raw observations
+        joint_pos = self.data.qpos[self.dof_ids]  # 7
+        joint_vel = self.data.qvel[self.dof_ids]  # 7
+        ee_pos = self.data.site(self.site_id).xpos  # 3
+        ee_quat = np.zeros(4)  # 4
         mujoco.mju_mat2Quat(ee_quat, self.data.site(self.site_id).xmat)
+        vector_obs = np.concatenate([joint_pos, joint_vel, ee_pos, ee_quat])  # 21
 
-        # below code works, but acts weird.
-        if False:
-            _camera_id = self.model.camera("topview").id
-            rgb = self.offscreen_renderer.render(
-                render_mode="rgb_array", camera_id=_camera_id
+        # image observations
+        _camera_ids = ["frontview", "topview", "leftview", "rightview"]
+        images = []
+
+        for cam_id in _camera_ids:
+            self.offscreen_renderer.update_scene(
+                data=self.data, camera=self.model.camera(cam_id).id
             )
+            images.append(self.offscreen_renderer.render())
 
-        return np.concatenate([joint_pos, joint_vel, ee_pos, ee_quat])
+        images = np.array(images)
+
+        return {"vector": vector_obs, "images": images}
 
     def step(self, action):
-        continuous_action, grip = action
-        robot_tau = self._compute_osc(continuous_action)
-        ctrl = np.zeros(self.model.nu)
-        ctrl[self.actuator_ids] = robot_tau
-        ctrl[self.grip_actuator_id] = 255 if grip == 0 else 0
-        self.do_simulation(ctrl, self.frame_skip)
+
+        for i in range(self.gym_step):
+            continuous_action, grip = action
+            robot_tau = self._compute_osc(continuous_action)
+            ctrl = np.zeros(self.model.nu)
+            ctrl[self.actuator_ids] = robot_tau
+            ctrl[self.grip_actuator_id] = 255 if grip == 0 else 0
+            self.do_simulation(ctrl, self.frame_skip)
+            if self.render_mode == "human":
+                self.render()
 
         obs = self._get_obs()
         reward = 0.0  # Customize as needed
         terminated = False
         truncated = False
         info = {}
-
-        if self.render_mode == "human":
-            self.render()
 
         return obs, reward, terminated, truncated, info
 
