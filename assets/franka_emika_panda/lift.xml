@@ -4,8 +4,8 @@
   <!-- Assets for visual properties -->
   <asset>
     <material name="table_mat" rgba="0.58 0.29 0.0 1" /> <!-- Brown table -->
-    <material name="red_block" rgba="1 0 0 1" /> <!-- Red block -->
-    <material name="blue_block" rgba="0 0 1 1" /> <!-- Blue block -->
+    <material name="red" rgba="1 0 0 1" /> <!-- Red block -->
+    <material name="blue" rgba="0 0 1 1" /> <!-- Blue block -->
   </asset>
 
   <!-- Table with blocks and cameras -->
@@ -16,23 +16,18 @@
     </body>
 
     <!-- Block 1: dynamic body -->
-    <body name="block1" pos="0.4 0.15 0.25" quat="1 0 0 0">
-      <geom size="0.0210 0.0210 0.0210" material="red_block" type="box" friction="1 0.3 0.0005"
+    <body name="block1" pos="0.4 0.15 0.225" quat="1 0 0 0">
+      <geom size="0.025 0.025 0.025" material="red" type="box" friction="1 0.3 0.0005"
         mass="0.005" />
       <joint type="free" />
     </body>
 
     <!-- Block 2: dynamic body -->
-    <body name="block2" pos="0.4 -0.15 0.25" quat="1 0 0 0">
-      <geom size="0.0210 0.0210 0.0210" material="blue_block" type="box" friction="1 0.3 0.0005"
+    <body name="block2" pos="0.4 -0.15 0.225" quat="1 0 0 0">
+      <geom size="0.025 0.025 0.025" material="blue" type="box" friction="1 0.3 0.0005"
         mass="0.005" />
       <joint type="free" />
     </body>
 
-    <camera name="frontview" pos="1.15 0 0.2125" quat="0.5 0.5 0.5 0.5" />
-    <camera name="agentview" pos="1.15 0 0.5" quat="0.5879378 0.3928475 0.3928475 0.5879378" />
-    <camera name="topview" pos="0.4 0 0.86" quat="0.7071068 0 0 0.7071068" />
-    <camera name="leftview" pos="0.4 -0.6 0.25" quat="0.7071068 0.7071068 0 0" />
-    <camera name="rightview" pos="0.4 0.6 0.25" quat="0 0 0.7071068 0.7071068" />
   </worldbody>
 </mujoco>

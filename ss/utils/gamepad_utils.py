@@ -5,7 +5,7 @@ from ss.gamepad.gamepad import available
 from ss.gamepad.controllers import PS4
 
 
-def get_gamepad_action(gamepad):
+def get_gamepad_action(gamepad, position_gain=5e-4, orientation_gain=5e-4):
     """
     returns the action, control_active and terminate
     action : array of size 7, where first 6 elements are the position input and the last element is the gripper input
@@ -15,13 +15,18 @@ def get_gamepad_action(gamepad):
 
     action = np.zeros((7,))
 
-    # position deltas
-    position_gain = 0.001
-    action[0] = position_gain * gamepad.axis("LEFT-Y")  # x
-    action[1] = position_gain * gamepad.axis("LEFT-X")  # y
-    action[2] = -position_gain * gamepad.axis("RIGHT-Y")  # z
+    threshold = 1e-1  # to remove deadzone noise
 
-    # orientation deltas set to zero
+    x = gamepad.axis("LEFT-Y") if abs(gamepad.axis("LEFT-Y")) > threshold else 0
+    y = gamepad.axis("LEFT-X") if abs(gamepad.axis("LEFT-X")) > threshold else 0
+    z = gamepad.axis("RIGHT-Y") if abs(gamepad.axis("RIGHT-Y")) > threshold else 0
+
+    # position deltas
+    action[0] = position_gain * x
+    action[1] = position_gain * y
+    action[2] = -position_gain * z
+
+    # orientation deltas set to zero, TODO.
     action[3] = 0
     action[4] = 0
     action[5] = 0
