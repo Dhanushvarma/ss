@@ -122,6 +122,7 @@ class FrankaEnv(MujocoEnv):
             1.57079,
             -2.29,
         ]  # except the hand joints
+        self._reset_noise_scale = 0.1
 
         # action Space
         self.action_space = spaces.Tuple(
@@ -252,10 +253,10 @@ class FrankaEnv(MujocoEnv):
                 self.render()
 
         obs = self._get_obs()
-        reward = 0.0  # Customize as needed
-        terminated = False
+        reward = 0.0  # TODO: not doing RL so fine for now
+        terminated = self._task_done()
         truncated = False
-        info = {}
+        info = {}  # TODO: figure out what to
 
         return obs, reward, terminated, truncated, info
 
@@ -351,3 +352,36 @@ class FrankaEnv(MujocoEnv):
         )
 
         return robot_tau
+
+    # ------- Methdods to override in the subclass for sure ------- #
+
+    def _task_done(self):
+        return False
+
+    def reset_model(self):
+        """
+        Resets with some noise
+        """
+
+        # reset arm to home position + noise
+        noise_low = -self._reset_noise_scale
+        noise_high = self._reset_noise_scale
+        _reset_joint_pos_franka = self.home_joint_pos + self.np_random.uniform(
+            low=noise_low, high=noise_high, size=len(self.joint_names)
+        )
+        self.data.qpos[self.dof_ids] = _reset_joint_pos_franka
+
+        # call mj_forward to update the data
+        mujoco.mj_forward(self.model, self.data)
+
+        # update mocap target to be there
+        self.data.mocap_pos[self.mocap_id] = self.data.site(self.site_id).xpos.copy()
+        self.data.mocap_quat[self.mocap_id] = np.array([1, 0, 0, 0])
+        if False:
+            mujoco.mju_mat2Quat(
+                self.data.mocap_quat[self.mocap_id], self.data.site(self.site_id).xmat
+            )
+
+        observation = self._get_obs()
+
+        return observation
