@@ -32,7 +32,7 @@ try:
         # Reset the environment with a seed for reproducibility
         observation, info = env.reset(seed=42)
 
-        # Initialize episode data as a list (to match RLDS example format)
+        # Initialize episode data as a list
         episode = []
 
         done = False
@@ -53,18 +53,41 @@ try:
                     action_tuple
                 )
 
-                # Record the step data as a dictionary (matching RLDS example format)
+                # Extract state components (all non-image data)
+                state_components = []
+
+                # Add all non-image observations to state
+                for key, value in observation.items():
+                    if "view" not in key:  # Skip image data
+                        state_components.append(
+                            value.flatten()
+                        )  # Flatten in case any are multi-dimensional
+
+                # Combine all state components into a single vector
+                state = np.concatenate(state_components).astype(np.float32)
+
+                # Convert action_tuple to a single numpy array
+                # Combine continuous action and gripper action
+                action_array = np.zeros(
+                    7, dtype=np.float32
+                )  # 6 for continuous + 1 for gripper
+                action_array[:6] = continuous_action
+                action_array[6] = float(grip)
+
+                # Record the step data
                 step_data = {
-                    "observation": observation,  # Or structure this as needed
-                    "action": np.asarray(
-                        action, dtype=np.float32
-                    ),  # Store full action as array
+                    "front_image": observation["front_view"],
+                    "left_image": observation["left_view"],
+                    "right_image": observation["right_view"],
+                    "top_image": observation["top_view"],
+                    "state": state,
+                    "action": action_array,
                     "reward": float(reward),
                     "discount": 0.0 if (terminated or truncated) else 1.0,
                     "is_first": step_idx == 0,
                     "is_last": terminated or truncated,
                     "is_terminal": terminated,
-                    "language_instruction": "pick up object",  # Add a dummy instruction if needed
+                    "language_instruction": "pick up object",  # Add appropriate instruction
                 }
 
                 # Add step to episode
