@@ -53,34 +53,28 @@ try:
                     action_tuple
                 )
 
-                # Extract state components (all non-image data)
-                state_components = []
-
-                # Add all non-image observations to state
-                for key, value in observation.items():
-                    if "view" not in key:  # Skip image data
-                        state_components.append(
-                            value.flatten()
-                        )  # Flatten in case any are multi-dimensional
-
-                # Combine all state components into a single vector
-                state = np.concatenate(state_components).astype(np.float32)
-
                 # Convert action_tuple to a single numpy array
-                # Combine continuous action and gripper action
                 action_array = np.zeros(
                     7, dtype=np.float32
                 )  # 6 for continuous + 1 for gripper
                 action_array[:6] = continuous_action
                 action_array[6] = float(grip)
 
-                # Record the step data
+                # Create step data dictionary with original keys
                 step_data = {
-                    "front_image": observation["front_view"],
+                    # Keep all original observation keys except 'front_view'
+                    "eef_pos": observation["eef_pos"],
+                    "eef_quat": observation["eef_quat"],
+                    "gripper_pos": observation["gripper_pos"],
+                    "joint_pos": observation["joint_pos"],
+                    "blocks_poses": observation["blocks_poses"],
+                    # Map front_view to image (required by RLDS)
+                    "image": observation["front_view"],
+                    # Keep other camera views with original keys
                     "left_image": observation["left_view"],
                     "right_image": observation["right_view"],
                     "top_image": observation["top_view"],
-                    "state": state,
+                    # Action and metadata
                     "action": action_array,
                     "reward": float(reward),
                     "discount": 0.0 if (terminated or truncated) else 1.0,
